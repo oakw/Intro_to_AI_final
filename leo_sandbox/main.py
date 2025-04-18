@@ -16,7 +16,7 @@ from martins_sandbox.test_performance import visualize_path
 
 # API endpoint - update to use local mock server
 # BASE_URL = "http://157.180.73.240:8080/"  # Remote server
-BASE_URL = "http://localhost:5000/"  # Local mock server
+BASE_URL = "http://127.0.0.1:5000/"  # Local mock server
 temp_calls = 100  # Number of calls for exploration phase
 # Set default layout_id to '2'
 DEFAULT_LAYOUT_ID = '1'
@@ -87,8 +87,8 @@ def find_best_locations(layout_id='1'):
         time.sleep(0.1)
         
         # Store the point and its value
-        X.append((x, y))
-        Y.append(result)
+        X.append((x, y))  # Store point directly during optimization
+        Y.append(result)  # Store result directly during optimization
         
         # Check if we found the optimal value (1000)
         if result == 1000:
@@ -110,8 +110,8 @@ def find_best_locations(layout_id='1'):
                          verbose=True, callback=callback)
     
     # Extract the results
-    X_array = np.array([x for x in X])
-    Y_array = np.array(Y)
+    X_array = np.array(res_gp.x_iters)
+    Y_array = -np.array(res_gp.func_vals)
     
     # If we found an optimal value, explore around it with remaining calls
     calls_used = len(X)
