@@ -31,6 +31,9 @@ def get_score_at_position(layout_image, x, y):
     img_y = int((y + 100) * 799 / 200)
     
     # Get pixel value (0 is black, 255 is white)
+    # Need to flip the y-coordinate since image origin is at top-left
+    # but we want bottom-left to be (-100, -100)
+    img_y = int((100 - y) * 799 / 200)  # Flip y-axis
     pixel_value = layout_image.getpixel((img_x, img_y))
     
     # Map from [0, 255] to [-1000, 1000]
