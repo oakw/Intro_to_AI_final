@@ -7,10 +7,12 @@
 # 
 import requests
 from vizualizer import visualize_environment
+import time
 
 API_PORT = 5000
 API_BASE_URI = f"http://127.0.0.1{':' + str(API_PORT) if API_PORT is not None else ''}/1"
-EXPLORE_ITERATIONS = 200
+EXPLORE_ITERATIONS = 100
+INITIAL_RANDOM_POINT_COUNT = 10
 PATH_LENGTH = 10
 
 class Agent:
@@ -37,6 +39,7 @@ class Agent:
     def _query_z(self, x: float, y: float):
         """Query the actual z value at (x, y)"""
         response = requests.get(f"{API_BASE_URI}/{x}/{y}")
+        time.sleep(0.1)  # small delay to avoid overwhelming the server
         
         if response.status_code == 200:
             return response.json().get('z')
@@ -114,7 +117,8 @@ if __name__ == '__main__':
     explorer = Explorer(
         GaussianProcessExploreExploit(
             space_bounds=(-100, 100),
-            n_iterations=EXPLORE_ITERATIONS,
+            explore_iterations=EXPLORE_ITERATIONS,
+            initial_random_point_count=INITIAL_RANDOM_POINT_COUNT,
             path_length=PATH_LENGTH,
             # One can use predetermined_sample to exploit the environment with a set of known points.
             # That could be useful to run the exploitation with two algorithms.

@@ -20,7 +20,8 @@ class GaussianProcessExploreExploit:
     def __init__(
             self,
             space_bounds = (-100, 100),
-            n_iterations: int = 200,
+            initial_random_point_count: int = 10,
+            explore_iterations: int = 100,
             path_length: int = 10,
             avoid_negative: bool = False,
             predetermined_sample: list[tuple[int, int, int]]|None = None,
@@ -29,15 +30,17 @@ class GaussianProcessExploreExploit:
         Initialize the Gaussian Process for exploration and exploitation.
         
         :param space_bounds: Tuple of (min, max) bounds for the search space
-        :param n_iterations: Number of iterations for exploration
+        :param initial_random_point_count: Number of initial random points for exploration
+        :param explore_iterations: Number of iterations for exploration
         :param path_length: Length of the path to be exploited
         :param avoid_negative: Whether to avoid negative regions during path finding
         :param predetermined_sample: List of tuples (x, y, z) for predetermined samples
         """
         self.space_bounds = space_bounds
-        self.n_iterations = n_iterations
+        self.explore_iterations = explore_iterations
         self.path_length = path_length
         self.avoid_negative = avoid_negative
+        self.initial_random_point_count = initial_random_point_count
         self.predetermined_sample = predetermined_sample if predetermined_sample is not None else []
         
         # Data storage
@@ -61,7 +64,7 @@ class GaussianProcessExploreExploit:
         :param query_z: Function to query the z value at a given (x, y) position
         :return: Trained Gaussian Process model
         """
-        print(f"Starting Gaussian Process exploration with {self.n_iterations} iterations...")
+        print(f"Starting Gaussian Process exploration with {self.explore_iterations} iterations...")
         print(f"Using device: {self.device}")
         
         # Define bounds for the search space
@@ -75,26 +78,21 @@ class GaussianProcessExploreExploit:
             self.train_y = [z for _, _, z in self.predetermined_sample]
         else:
             # Initial random sampling within bounds
-            # TODO: padot kā vairākus mainīgos
-            n_initial = 10
-            X_initial = torch.rand(n_initial, 2, device=self.device, dtype=torch.float64)
+            X_initial = torch.rand(self.initial_random_point_count, 2, device=self.device, dtype=torch.float64)
             # Transform from [0, 1] to [min_bound, max_bound]
             X_initial = X_initial * (self.space_bounds[1] - self.space_bounds[0]) + self.space_bounds[0]
             
-            print(f"Starting with {n_initial} initial random points...")
-            for i in range(n_initial):
+            print(f"Starting with {self.initial_random_point_count} initial random points...")
+            for i in range(self.initial_random_point_count):
                 x, y = X_initial[i].tolist()
                 z = query_z(x, y)
                 
                 if z is not None:
                     self.train_x.append([x, y])
                     self.train_y.append(z)
-                
-                time.sleep(0.1)  # Be nice to the API
-            
+                            
             # Main Bayesian Optimization loop
-            # TODO: fix
-            remaining_calls = 100 - len(self.train_x)
+            remaining_calls = self.explore_iterations - self.initial_random_point_count
             
             # Convert to tensors with double precision
             train_x_tensor = torch.tensor(self.train_x, dtype=torch.float64, device=self.device)
@@ -142,6 +140,18 @@ class GaussianProcessExploreExploit:
                 # Convert normalized point back to original space
                 new_x = bounds_tensor[0] + (bounds_tensor[1] - bounds_tensor[0]) * new_x_normalized
                 new_x_value, new_y_value = new_x[0].tolist()
+                new_x_value = round(new_x_value, 2)
+                new_y_value = round(new_y_value, 2)
+
+                # TODO: This is a horrible fix to a problem of SingleTaskGP reapeatedly generating the same value
+                # should probably better use something else from MultiTaskGP family
+                # if [new_x_value, new_y_value] in self.train_x:
+                #     print(f"Point ({new_x_value}, {new_y_value}) already evaluated, placing it back nevertheless...")
+                #     self.train_x.append([new_x_value, new_y_value])
+                #     self.train_y.append(self.train_y[self.train_x.index([new_x_value, new_y_value])])
+                #     train_x_tensor = torch.tensor(self.train_x, dtype=torch.float64, device=self.device)
+                #     train_y_tensor = torch.tensor(self.train_y, dtype=torch.float64, device=self.device).unsqueeze(-1)
+                #     continue 
                 
                 # Query the value at the new point
                 z = query_z(new_x_value, new_y_value)
@@ -158,7 +168,6 @@ class GaussianProcessExploreExploit:
                         found_optimal = True
                         print(f"Found optimal value at ({new_x_value}, {new_y_value})!")
                 
-                time.sleep(0.1)  # Be nice to the API
         
         # Fit final model
         if len(self.train_x) > 0:
@@ -299,9 +308,7 @@ class GaussianProcessExploreExploit:
                         # Store result in grid_data
                         self.grid_data[(x, y)] = z
                         evaluated_points.add((x, y))
-                    
-                    time.sleep(0.1)  # Be nice to the API
-        
+                            
         # Find best path from the top points
         best_overall_path = []
         best_overall_value = float('-inf')

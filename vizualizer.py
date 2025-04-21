@@ -18,21 +18,13 @@ def visualize_environment(explore_exploit_instance):
             grid_points.append([x, y])
     grid_points = np.array(grid_points)
     
-    # Simple adapter function to handle prediction for both model types
-    def predict_values(model, points):
-        if hasattr(model, 'predict'):
-            # For scikit-learn models (RandomForest)
-            return model.predict(points)
-        elif hasattr(model, 'posterior'):
-            # For BoTorch models (GaussianProcess)
-            device = next(model.parameters()).device
-            x_tensor = torch.tensor(points, dtype=torch.float64, device=device)
-            posterior = model.posterior(x_tensor)
-            return posterior.mean.detach().cpu().numpy().flatten()
-        else:
-            raise ValueError("Unsupported model type. Model must have either predict() or posterior() method.")
-            
-    mean_scores = predict_values(explore_exploit_instance.get_model(), grid_points)
+    model = explore_exploit_instance.get_model()
+    
+    # Predict values with appropriate model type
+    if hasattr(model, 'predict'):
+        mean_scores = model.predict(grid_points)
+    else:
+        mean_scores = predict_gp(model, grid_points, explore_exploit_instance.space_bounds)
 
     plt.scatter(grid_points[:, 0], grid_points[:, 1], c=mean_scores, cmap='viridis')
     plt.colorbar(label='Predicted z value')
@@ -40,9 +32,24 @@ def visualize_environment(explore_exploit_instance):
     if hasattr(explore_exploit_instance, 'best_path') and explore_exploit_instance.best_path is not None:
         best_path_x, best_path_y = zip(*explore_exploit_instance.best_path)
         plt.plot(best_path_x, best_path_y, color='red', linewidth=2, label='Best Path')
-        # plt.scatter(best_path_x, best_path_y, color='red', s=50, label='Path Points')
 
     plt.xlabel('X-axis')
     plt.ylabel('Y-axis')
     plt.title('Predicted Environment Visualization')
     plt.show()
+
+def predict_gp(model, points, bounds):
+    """Helper function for GP model prediction with proper scaling"""
+    device = next(model.parameters()).device
+    x_tensor = torch.tensor(points, dtype=torch.float64, device=device)
+    
+    # Normalize inputs to [0,1] range
+    min_bound, max_bound = bounds
+    x_normalized = (x_tensor - min_bound) / (max_bound - min_bound)
+    
+    # Get predictions
+    posterior = model.posterior(x_normalized)
+    
+    # Scale to match typical range of scores (-1000 to 1000)
+    mean = posterior.mean.detach().cpu().numpy().flatten()
+    return mean * 1000
