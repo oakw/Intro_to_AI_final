@@ -75,7 +75,7 @@ class GaussianProcessExploreExploit:
             self.train_y = [z for _, _, z in self.predetermined_sample]
         else:
             # Initial random sampling within bounds
-            # TODO:
+            # TODO: padot kā vairākus mainīgos
             n_initial = 10
             X_initial = torch.rand(n_initial, 2, device=self.device, dtype=torch.float64)
             # Transform from [0, 1] to [min_bound, max_bound]
@@ -93,7 +93,7 @@ class GaussianProcessExploreExploit:
                 time.sleep(0.1)  # Be nice to the API
             
             # Main Bayesian Optimization loop
-            # TODO: 
+            # TODO: fix
             remaining_calls = 100 - len(self.train_x)
             
             # Convert to tensors with double precision
@@ -154,6 +154,7 @@ class GaussianProcessExploreExploit:
                     
                     # Check if we found optimal value (1000)
                     if z == 1000:
+                        # TODO: very biased; kko var uzlabot?
                         found_optimal = True
                         print(f"Found optimal value at ({new_x_value}, {new_y_value})!")
                 
@@ -328,6 +329,7 @@ class GaussianProcessExploreExploit:
                 
                 # Check valid neighbors
                 for neighbor in get_neighbors(current):
+                    # TODO: kko šādu varētu arī iekš explorēšanas. Pārbaudi, vai round(x, 2) un round(y, 2) jau nav vaicāts
                     if neighbor not in visited:
                         # If we don't know the value yet, query it
                         if neighbor not in self.grid_data:
@@ -366,7 +368,8 @@ class GaussianProcessExploreExploit:
                         break
             
             best_overall_path = path
-        
+        # TODO: Dijkstra?
+
         # Ensure path is exactly path_length
         if len(best_overall_path) > self.path_length:
             best_overall_path = best_overall_path[:self.path_length]
