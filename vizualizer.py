@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 
 def visualize_environment(explore_exploit_instance):
     """
@@ -16,7 +17,22 @@ def visualize_environment(explore_exploit_instance):
         for y in range(explore_exploit_instance.space_bounds[0], explore_exploit_instance.space_bounds[1] + 1):
             grid_points.append([x, y])
     grid_points = np.array(grid_points)
-    mean_scores = explore_exploit_instance.get_model().predict(grid_points)
+    
+    # Simple adapter function to handle prediction for both model types
+    def predict_values(model, points):
+        if hasattr(model, 'predict'):
+            # For scikit-learn models (RandomForest)
+            return model.predict(points)
+        elif hasattr(model, 'posterior'):
+            # For BoTorch models (GaussianProcess)
+            device = next(model.parameters()).device
+            x_tensor = torch.tensor(points, dtype=torch.float64, device=device)
+            posterior = model.posterior(x_tensor)
+            return posterior.mean.detach().cpu().numpy().flatten()
+        else:
+            raise ValueError("Unsupported model type. Model must have either predict() or posterior() method.")
+            
+    mean_scores = predict_values(explore_exploit_instance.get_model(), grid_points)
 
     plt.scatter(grid_points[:, 0], grid_points[:, 1], c=mean_scores, cmap='viridis')
     plt.colorbar(label='Predicted z value')

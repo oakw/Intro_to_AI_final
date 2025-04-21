@@ -110,10 +110,9 @@ class Exploiter(Agent):
 
 
 if __name__ == '__main__':
-    # TODO: Decide on the explore/exploit algorithm(s) to use.
-    from martins_sandbox.random_forest_regressor import RandomForestRegressorExploreExploit
+    from leo_sandbox.alternative import GaussianProcessExploreExploit
     explorer = Explorer(
-        RandomForestRegressorExploreExploit(
+        GaussianProcessExploreExploit(
             space_bounds=(-100, 100),
             n_iterations=EXPLORE_ITERATIONS,
             path_length=PATH_LENGTH,
