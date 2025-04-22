@@ -122,8 +122,8 @@ class Exploiter(Agent):
 
 
 if __name__ == '__main__':
-    from leo_sandbox.alternative import GaussianProcessExploreExploit
-    from martins_sandbox.random_forest_regressor import RandomForestRegressorExploreExploit
+    from gaussian_process import GaussianProcessExploreExploit
+    from random_forest_regressor import RandomForestRegressorExploreExploit
 
     gp_explorer = Explorer(
         GaussianProcessExploreExploit(

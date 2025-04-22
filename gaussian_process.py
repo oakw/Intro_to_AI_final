@@ -394,6 +394,9 @@ class GaussianProcessExploreExploit:
         
         :param query_z: Function to query the z value at a given (x, y) position
         """
+        if self.best_path is None:
+            print("No path found. Please run explore first.")
+            return []
 
         # Verify and query the path points
         if len(self.best_path) < self.path_length:
