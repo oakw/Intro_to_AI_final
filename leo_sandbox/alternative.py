@@ -8,6 +8,7 @@ from botorch.optim import optimize_acqf
 from botorch.utils.transforms import standardize, normalize
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from typing import Callable
+import heapq
 
 
 def get_neighbors(point):
@@ -145,13 +146,13 @@ class GaussianProcessExploreExploit:
 
                 # TODO: This is a horrible fix to a problem of SingleTaskGP reapeatedly generating the same value
                 # should probably better use something else from MultiTaskGP family
-                # if [new_x_value, new_y_value] in self.train_x:
-                #     print(f"Point ({new_x_value}, {new_y_value}) already evaluated, placing it back nevertheless...")
-                #     self.train_x.append([new_x_value, new_y_value])
-                #     self.train_y.append(self.train_y[self.train_x.index([new_x_value, new_y_value])])
-                #     train_x_tensor = torch.tensor(self.train_x, dtype=torch.float64, device=self.device)
-                #     train_y_tensor = torch.tensor(self.train_y, dtype=torch.float64, device=self.device).unsqueeze(-1)
-                #     continue 
+                if [new_x_value, new_y_value] in self.train_x:
+                    print(f"Point ({new_x_value}, {new_y_value}) already evaluated, placing it back nevertheless...")
+                    self.train_x.append([new_x_value, new_y_value])
+                    self.train_y.append(self.train_y[self.train_x.index([new_x_value, new_y_value])])
+                    train_x_tensor = torch.tensor(self.train_x, dtype=torch.float64, device=self.device)
+                    train_y_tensor = torch.tensor(self.train_y, dtype=torch.float64, device=self.device).unsqueeze(-1)
+                    continue 
                 
                 # Query the value at the new point
                 z = query_z(new_x_value, new_y_value)
@@ -314,12 +315,13 @@ class GaussianProcessExploreExploit:
         best_overall_value = float('-inf')
         
         # Try the top points as starting points
-        for point, _ in sorted(list(self.grid_data.items()), key=lambda x: x[1], reverse=True)[:10]:
+        # Try all points as potential starting points to find the best overall path
+        for point in self.grid_data.keys():
             path, value = self._find_best_path(point)
             if value > best_overall_value and len(path) == self.path_length:
                 best_overall_value = value
                 best_overall_path = path
-        
+
         # If we didn't find a valid path, use greedy approach
         if not best_overall_path or len(best_overall_path) < self.path_length:
             print("No valid path found with DFS. Using greedy approach...")
@@ -337,6 +339,7 @@ class GaussianProcessExploreExploit:
                 # Check valid neighbors
                 for neighbor in get_neighbors(current):
                     # TODO: kko šādu varētu arī iekš explorēšanas. Pārbaudi, vai round(x, 2) un round(y, 2) jau nav vaicāts
+                    
                     if neighbor not in visited:
                         # If we don't know the value yet, query it
                         if neighbor not in self.grid_data:
@@ -375,7 +378,6 @@ class GaussianProcessExploreExploit:
                         break
             
             best_overall_path = path
-        # TODO: Dijkstra?
 
         # Ensure path is exactly path_length
         if len(best_overall_path) > self.path_length:
