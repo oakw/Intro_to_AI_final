@@ -4,3 +4,4 @@ numpy==2.2.5
 torch==2.6.0
 botorch==0.10.0
 scikit-learn==1.6.1
+tqdm==4.67.1

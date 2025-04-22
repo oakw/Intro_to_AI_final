@@ -8,12 +8,14 @@
 import requests
 from vizualizer import visualize_environment
 import time
+from datetime import datetime
 
 API_PORT = 5000
 API_BASE_URI = f"http://127.0.0.1{':' + str(API_PORT) if API_PORT is not None else ''}/1"
 EXPLORE_ITERATIONS = 100
 INITIAL_RANDOM_POINT_COUNT = 10
 PATH_LENGTH = 10
+ACQF_OPTIMIZATION_KWARGS = {'num_restarts': 20, 'raw_samples': 500}
 
 class Agent:
     def __init__(self):
@@ -67,7 +69,12 @@ class Explorer(Agent):
                 return None
             return move['z']
 
-        self.explore_class.explore(query_z)
+        try:
+            self.explore_class.explore(query_z)
+        except Exception as e:
+            print(f"Error during exploration: {e}")
+            self.save_moves_csv(f"explore_error_{datetime.now().isoformat()}.csv")
+            raise
 
     def save_moves_csv(self, filename: str = f"explore_{API_PORT}.csv"):
         """Save explorer moves to a CSV file"""
@@ -101,37 +108,63 @@ class Exploiter(Agent):
         """Save exploiter moves to a CSV file"""
         super().save_moves_csv(filename)
 
+    def get_total_score(self):
+        """Get the total score of the moves"""
+        return sum(move['z'] for move in self.moves)
+
     def summary(self):
         """Print summary of moves"""
-        total_z = 0
-        print("Moves:")
+        print(f"\033[32m{self.exploiter_class.__class__.__name__}\033[0m Moves:")
         for move in self.moves:
-            total_z += move['z']
             print(f"x: {move['x']}, y: {move['y']}, z: {move['z']}")
 
-        print(f"Total z value: {total_z}")
+        print(f"Total z value: {self.get_total_score()}\n")
 
 
 if __name__ == '__main__':
     from leo_sandbox.alternative import GaussianProcessExploreExploit
-    explorer = Explorer(
+    from martins_sandbox.random_forest_regressor import RandomForestRegressorExploreExploit
+
+    gp_explorer = Explorer(
         GaussianProcessExploreExploit(
             space_bounds=(-100, 100),
             explore_iterations=EXPLORE_ITERATIONS,
             initial_random_point_count=INITIAL_RANDOM_POINT_COUNT,
             path_length=PATH_LENGTH,
-            # One can use predetermined_sample to exploit the environment with a set of known points.
-            # That could be useful to run the exploitation with two algorithms.
-            # predetermined_sample=predetermined_sample,
+            acqf_optimization_kwargs={'num_restarts': 5, 'raw_samples': 20},
         )
     )
-    explorer.start()
-    explorer.save_moves_csv()
+    gp_explorer.start()
+    gp_explorer.save_moves_csv()
+    explored_points = [(move.get('x'), move.get('y'), move.get('z')) for move in gp_explorer.moves]
 
-    exploiter = Exploiter(explorer)
-    exploiter.start()
-    exploiter.save_moves_csv()
-    exploiter.summary()
+    # Now run the Random Forest Regressor with the same explored points (to avoid full re-exploration)
+    rf_explorer = Explorer(
+        RandomForestRegressorExploreExploit(
+            space_bounds=(-100, 100),
+            n_iterations=0,
+            path_length=PATH_LENGTH,
+            predetermined_sample=explored_points,
+        )
+    )
+    rf_explorer.start()
 
-    visualize_environment(exploiter.exploiter_class)
+    # Choose whichever performed better in the exploitation phase
+    gp_exploiter = Exploiter(gp_explorer)
+    gp_exploiter.start()
+
+    rf_exploiter = Exploiter(rf_explorer)
+    rf_exploiter.start()
+
+    gp_exploiter.summary()
+    rf_exploiter.summary()
+
+    if gp_exploiter.get_total_score() > rf_exploiter.get_total_score():
+        print("GP exploiter is better")
+        gp_exploiter.save_moves_csv()
+        visualize_environment(gp_exploiter.exploiter_class)
+    else:
+        print("RF exploiter is better")
+        rf_exploiter.save_moves_csv()
+        visualize_environment(rf_exploiter.exploiter_class)
 

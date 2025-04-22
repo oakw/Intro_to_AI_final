@@ -1,2 +1,4 @@
 *__pycache__*
 .venv
+explore*.csv
+moves*.csv
