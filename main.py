@@ -9,21 +9,31 @@ import requests
 from vizualizer import visualize_environment
 import time
 from datetime import datetime
+import os
 
 API_PORT = 5000
 API_BASE_URI = f"http://127.0.0.1{':' + str(API_PORT) if API_PORT is not None else ''}/1"
-EXPLORE_ITERATIONS = 100
-INITIAL_RANDOM_POINT_COUNT = 10
+EXPLORE_ITERATIONS = 115
+INITIAL_RANDOM_POINT_COUNT = 45
 PATH_LENGTH = 10
 ACQF_OPTIMIZATION_KWARGS = {'num_restarts': 20, 'raw_samples': 500}
 
 class Agent:
+    moves_log_file = os.path.join(os.path.dirname(__file__), 'logs', f"all_moves_{datetime.now().timestamp()}.csv")
+    os.makedirs(os.path.dirname(moves_log_file), exist_ok=True)
+    with open(moves_log_file, 'w') as file:
+        file.write("x,y,z\n")
+
     def __init__(self):
         self.moves = []
 
     def move_to(self, x: float, y: float): 
         """Record the move"""
         move = dict(x=x, y=y, z=self._query_z(x, y))
+        
+        with open(self.moves_log_file, 'a') as file:
+            file.write(f"{move['x']},{move['y']},{move['z']}\n")
+
         if move['z'] is None:
             return None
         
@@ -73,7 +83,7 @@ class Explorer(Agent):
             self.explore_class.explore(query_z)
         except Exception as e:
             print(f"Error during exploration: {e}")
-            self.save_moves_csv(f"explore_error_{datetime.now().isoformat()}.csv")
+            self.save_moves_csv(f"explore_error_{datetime.now().timestamp()}.csv")
             raise
 
     def save_moves_csv(self, filename: str = f"explore_{API_PORT}.csv"):

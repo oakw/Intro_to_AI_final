@@ -2,3 +2,4 @@
 .venv
 explore*.csv
 moves*.csv
+logs

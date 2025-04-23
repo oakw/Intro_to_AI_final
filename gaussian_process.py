@@ -12,9 +12,9 @@ import warnings
 
 
 def get_neighbors(point):
-    """Get adjacent points (up, right, down, left)"""
+    """Get adjacent points (up, right, down, left and diagonals)"""
     x, y = point
-    return [(x+dx, y+dy) for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]
+    return [(x+dx, y+dy) for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)] #, (1, 1), (-1, -1), (1, -1), (-1, 1)]
             if -100 <= x+dx <= 100 and -100 <= y+dy <= 100]
 
 class GaussianProcessExploreExploit:
@@ -100,15 +100,8 @@ class GaussianProcessExploreExploit:
             # Convert to tensors with double precision
             train_x_tensor = torch.tensor(self.train_x, dtype=torch.float64, device=self.device)
             train_y_tensor = torch.tensor(self.train_y, dtype=torch.float64, device=self.device).unsqueeze(-1)
-            
-            found_optimal = False  # Flag for early stopping if we find value of 1000
-            
-            for iteration in tqdm(range(remaining_calls), desc="Exploration", unit="iteration"):
-                # Check if we have enough good points and should stop early
-                if found_optimal and iteration > min(30, remaining_calls // 2):
-                    tqdm.write("Found optimal point, transitioning to exploitation phase")
-                    break
-                
+                        
+            for _ in tqdm(range(remaining_calls), desc="Exploration", unit="iteration"):
                 # Step 1: Update normalized and standardized data
                 train_x_normalized = normalize(train_x_tensor, bounds=bounds_tensor)
                 train_y_standardized = standardize(train_y_tensor)
@@ -159,12 +152,6 @@ class GaussianProcessExploreExploit:
                     self.train_y.append(z)
                     train_x_tensor = torch.tensor(self.train_x, dtype=torch.float64, device=self.device)
                     train_y_tensor = torch.tensor(self.train_y, dtype=torch.float64, device=self.device).unsqueeze(-1)
-                    
-                    # Check if we found optimal value (1000)
-                    if z == 1000:
-                        # TODO: very biased; kko var uzlabot?
-                        found_optimal = True
-                        tqdm.write(f"Found optimal value at ({new_x_value}, {new_y_value})!")
                 
         
         # Fit final model
@@ -184,7 +171,7 @@ class GaussianProcessExploreExploit:
         # Prepare grid data for path planning
         self._prepare_grid_data()
 
-        print("Run a possible exploit grid search...")
+        print("Run a possible exploit grid search. May take a while...")
         # Use the exploration moves here to be better prepared for the exploit phase by preparing the best path
         self.best_path = self._exploit_grid_search(query_z)
         
@@ -338,7 +325,7 @@ class GaussianProcessExploreExploit:
                     visited.add(best_neighbor)
                 else:
                     # If no valid neighbors, try random direction
-                    for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                    for dx, dy in get_neighbors((0, 0)):
                         nx, ny = current[0] + dx, current[1] + dy
                         neighbor = (nx, ny)
                         
@@ -363,15 +350,16 @@ class GaussianProcessExploreExploit:
         if len(best_overall_path) > self.path_length:
             best_overall_path = best_overall_path[:self.path_length]
         
-        # Validate path - ensure all moves are orthogonal and single-step
+        # Validate path - ensure all moves are  single-step
         for i in range(len(best_overall_path)-1):
             x1, y1 = best_overall_path[i]
             x2, y2 = best_overall_path[i+1]
             dx = x2 - x1
             dy = y2 - y1
             
-            # Make sure this is a valid orthogonal move of distance 1
-            if not ((dx == 0 and abs(dy) == 1) or (dy == 0 and abs(dx) == 1)):
+            # Make sure this is a valid move of distance 1
+            if not ((dx == 0 and abs(dy) == 1) or (dy == 0 and abs(dx) == 1) or
+                    (abs(dx) == 1 and abs(dy) == 1)):
                 print(f"Warning: Invalid move from ({x1}, {y1}) to ({x2}, {y2}). Correcting path.")
                 # Insert intermediate point for diagonals
                 if dx != 0 and dy != 0:

@@ -7,9 +7,9 @@ from typing import Callable
 
 
 def get_neighbors(point):
-    """Get adjacent points (up, right, down, left)"""
+    """Get adjacent points (up, right, down, left and diagonals)"""
     x, y = point
-    return [(x+dx, y+dy) for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]
+    return [(x+dx, y+dy) for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)] #, (1, 1), (-1, -1), (1, -1), (-1, 1)]
             if -100 <= x+dx <= 100 and -100 <= y+dy <= 100]
 
 class RandomForestRegressorExploreExploit:
